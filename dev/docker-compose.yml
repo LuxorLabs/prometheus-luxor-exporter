@@ -1,0 +1,63 @@
+version: '3.7'
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+
+services:
+  luxor:
+    # uncomment this for build from the code
+    # build:
+    #  context: ..
+    #  args:
+    #    - APP_VERSION=0.0.0-SNAPSHOT
+    image: luxorlabs/prometheus-luxor-exporter:1.0.0
+    command:
+      - '--debug'
+      - '--endpoint=:8080'
+    user: 1000:1000
+    environment:
+      - TZ=Europe/Oslo
+    ports:
+      - 127.0.0.1:8080:8080/tcp
+    restart: unless-stopped
+
+  grafana:
+    user: root
+    image: grafana/grafana:9.0.2
+    volumes:
+      - ./tmp/grafana:/var/lib/grafana:z
+      - ./grafana/datasources.yml:/grafana/provisioning/datasources/datasources.yml:z
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    expose:
+      - 3000
+    ports:
+      - 3000:3000
+    # http://localhost:3000/?orgId=1
+
+  prometheus:
+    image: prom/prometheus:v2.36.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    expose:
+      - 9090
+    ports:
+      - 9090:9090
+    networks:
+      - monitoring
